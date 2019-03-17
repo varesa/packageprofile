@@ -57,10 +57,13 @@ def create_profile(packages: dict):
             cur.execute(f"""
             INSERT INTO pp_package_link (package_instance, profile)
             SELECT pp_package_instance.id, {profile_id} FROM pp_package_instance
-                JOIN pp_loading ON 
-                    (pp_package_instance.version = pp_loading.version AND
+                JOIN pp_loading ON (
+                    pp_package_instance.version = pp_loading.version AND
                     pp_package_instance.release = pp_loading.release AND
-                    pp_package_instance.arch = pp_loading.arch);
+                    pp_package_instance.arch = pp_loading.arch)
+                JOIN pp_package ON (
+                    pp_package.name = pp_loading.name AND
+                    pp_package.id = pp_package_instance.package);
             """)
         conn.commit()
 
