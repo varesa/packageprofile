@@ -33,10 +33,9 @@ def get_cursor() -> psycopg2.extensions.cursor:
 
 
 def init_db():
-    cur = conn.cursor(cursor_factory=LoggingCursor)
-    database_schema.update_schema(cur)
-    conn.commit()
-    cur.close()
+    with get_cursor() as cur:
+        database_schema.update_schema(cur)
+        conn.commit()
 
 
 def get_package_instances(package=None):
