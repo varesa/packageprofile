@@ -1,13 +1,14 @@
 import logging
+import os
 import psycopg2
 import psycopg2.extensions
 
 import database_schema
 
-conn: psycopg2.extensions.connection = psycopg2.connect("postgresql://postgres@localhost/postgres")
-
-# Test query:
-# SELECT format('%s-%s-%s.%s', pp_package.name, pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch) FROM pp_package JOIN pp_package_instance ON pp_package.id=pp_package_instance.package;
+try:
+    conn: psycopg2.extensions.connection = psycopg2.connect(os.environ['POSTGRESQL_URL'])
+except KeyError:
+    assert False, "Please set the environment variable POSTGRESQL_URL to a valid connection string"
 
 global queries
 queries = 0
