@@ -23,7 +23,10 @@ def create_profile(packages: dict):
             )
             cur.execute(f"INSERT INTO pp_loading (name, version, release, arch) VALUES {values};")
 
-        cur.execute("""SELECT md5(string_agg(name || version || release || arch, ', ')) FROM pp_loading;""")
+        cur.execute("""
+        SELECT 
+            md5(string_agg(name || version || release || arch, ', ' ORDER BY (name, version, release, arch))) 
+        FROM pp_loading;""")
         hash = cur.fetchone()[0]
 
         cur.execute(f"""SELECT id FROM pp_profile WHERE hash = '{hash}';""")
