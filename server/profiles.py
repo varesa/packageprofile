@@ -15,36 +15,50 @@ def chunks(i: Collection, n: int) -> Generator:
 
 def create_profile(packages: dict):
     with get_cursor() as cur:
-        cur.execute("TRUNCATE TABLE pp_loading;")
+        cur.execute("INSERT INTO pp_session DEFAULT VALUES RETURNING session");
+
+        session = str(cur.fetchone()[0])
+        table = "pp_temp_" + ("00" + session)[-3:]
+
+        cur.execute(f"""
+        CREATE TEMPORARY TABLE {table} (
+            id serial PRIMARY KEY,
+            name text NOT NULL,
+            version text NOT NULL, 
+            release text NOT NULL, 
+            arch text NOT NULL
+        );
+        """)
 
         for chunk in chunks(packages, 1000):
             values = ', '.join(
                 f"('{pkg['name']}', '{pkg['version']}', '{pkg['release']}', '{pkg['arch']}')" for pkg in chunk
             )
-            cur.execute(f"INSERT INTO pp_loading (name, version, release, arch) VALUES {values};")
+            cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values};")
 
-        cur.execute("""
+        cur.execute(f"""
         SELECT 
             md5(string_agg(
                 name || '/' || version || '/' || release || '/' || arch, 
                 ', ' ORDER BY (name, version, release, arch)
             )) 
-        FROM pp_loading;""")
+        FROM {table};""")
         hash = cur.fetchone()[0]
 
         cur.execute(f"""SELECT id FROM pp_profile WHERE hash = '{hash}';""")
+
         existing = cur.fetchone()
 
         if not existing:
-            cur.execute("""
+            cur.execute(f"""
             INSERT INTO pp_package (name)
-            SELECT DISTINCT name FROM pp_loading
+            SELECT DISTINCT name FROM {table}
             ON CONFLICT DO NOTHING;""")
 
-            cur.execute("""
+            cur.execute(f"""
             INSERT INTO pp_package_instance (package, version, release, arch)
-            SELECT pp_package.id, version, release, arch FROM pp_loading 
-                JOIN pp_package ON pp_package.name = pp_loading.name
+            SELECT pp_package.id, version, release, arch FROM {table} 
+                JOIN pp_package ON pp_package.name = {table}.name
             ON CONFLICT DO NOTHING;""")
 
             cur.execute(f"""
@@ -57,14 +71,19 @@ def create_profile(packages: dict):
             cur.execute(f"""
             INSERT INTO pp_package_link (package_instance, profile)
             SELECT pp_package_instance.id, {profile_id} FROM pp_package_instance
-                JOIN pp_loading ON (
-                    pp_package_instance.version = pp_loading.version AND
-                    pp_package_instance.release = pp_loading.release AND
-                    pp_package_instance.arch = pp_loading.arch)
+                JOIN {table} ON (
+                    pp_package_instance.version = {table}.version AND
+                    pp_package_instance.release = {table}.release AND
+                    pp_package_instance.arch = {table}.arch)
                 JOIN pp_package ON (
-                    pp_package.name = pp_loading.name AND
+                    pp_package.name = {table}.name AND
                     pp_package.id = pp_package_instance.package);
             """)
+
+        cur.execute(f"""
+        DROP TABLE {table};
+        DELETE FROM pp_session WHERE session = {session};""")
+
         conn.commit()
 
         return existing[0] if existing else profile_id
@@ -77,7 +96,8 @@ def set_host_profile(host, new_profile):
         cur.execute(f"""
         SELECT pp_profile_link.profile FROM pp_profile_link 
         JOIN pp_host ON pp_profile_link.host = pp_host.id 
-        WHERE pp_host.name = '{host}';""")
+        WHERE pp_host.name = '{host}'
+        ORDER BY pp_profile_link.id DESC LIMIT 1;""")
         result = cur.fetchone()
 
         if result:

@@ -1,5 +1,10 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def create_initial(cur):
-    print("Creating version table")
+    logger.info("Creating version table")
     cur.execute("CREATE TABLE pp_version (version integer PRIMARY KEY);")
     cur.execute("INSERT INTO pp_version (version) VALUES (0);")
 
@@ -55,6 +60,18 @@ def upgrade_version1(cur):
     """)
 
 
+def upgrade_version2(cur):
+    cur.execute("""
+    DROP TABLE pp_loading;
+    
+    CREATE TABLE pp_session (
+        session serial PRIMARY KEY
+    );
+    
+    UPDATE pp_version SET version = 2;
+    """)
+
+
 def update_schema(cur):
     cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'pp_version')")
     tables_exist = cur.fetchone()[0]
@@ -66,5 +83,9 @@ def update_schema(cur):
     version = cur.fetchone()[0]
 
     if version < 1:
-        print("Upgrading to version 1")
+        logger.info("Upgrading to version 1")
         upgrade_version1(cur)
+
+    if version < 2:
+        logger.info("Upgrading to version 2")
+        upgrade_version2(cur)
