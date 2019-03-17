@@ -25,12 +25,15 @@ def create_profile(packages: dict):
 
         cur.execute("""
         SELECT 
-            md5(string_agg(name || version || release || arch, ', ' ORDER BY (name, version, release, arch))) 
+            md5(string_agg(
+                name || '/' || version || '/' || release || '/' || arch, 
+                ', ' ORDER BY (name, version, release, arch)
+            )) 
         FROM pp_loading;""")
         hash = cur.fetchone()[0]
 
         cur.execute(f"""SELECT id FROM pp_profile WHERE hash = '{hash}';""")
-        existing = cur.fetchone()[0]
+        existing = cur.fetchone()
 
         if not existing:
             cur.execute("""
@@ -61,5 +64,5 @@ def create_profile(packages: dict):
             """)
         conn.commit()
 
-        return existing if existing else profile_id
+        return existing[0] if existing else profile_id
 
