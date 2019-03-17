@@ -17,7 +17,7 @@ def create_profile(packages: dict):
     with get_cursor() as cur:
         cur.execute("TRUNCATE TABLE pp_loading;")
 
-        for chunk in chunks(packages, 100):
+        for chunk in chunks(packages, 1000):
             values = ', '.join(
                 f"('{pkg['name']}', '{pkg['version']}', '{pkg['release']}', '{pkg['arch']}')" for pkg in chunk
             )
@@ -67,8 +67,21 @@ def create_profile(packages: dict):
         return existing[0] if existing else profile_id
 
 
-def set_host_profile(host, profile):
+def set_host_profile(host, new_profile):
     with get_cursor() as cur:
-        cur.execute(f"INSERT INTO pp_host (name, profile) "
-                    f"VALUES ('{host}', {profile}) "
-                    f"ON CONFLICT (name) DO UPDATE SET profile = EXCLUDED.profile;")
+        cur.execute(f"INSERT INTO pp_host (name) VALUES ('{host}') ON CONFLICT DO NOTHING;")
+
+        cur.execute(f"""
+        SELECT pp_profile_link.profile FROM pp_profile_link 
+        JOIN pp_host ON pp_profile_link.host = pp_host.id 
+        WHERE pp_host.name = '{host}';""")
+        result = cur.fetchone()
+
+        if result:
+            old_profile = result[0]
+            if new_profile == old_profile:
+                return
+
+        cur.execute(f"INSERT INTO pp_profile_link (host, profile, date) "
+                    f"SELECT pp_host.id, {new_profile}, now() FROM pp_host WHERE pp_host.name = '{host}';")
+        conn.commit()

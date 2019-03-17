@@ -8,49 +8,51 @@ def upgrade_version1(cur):
     cur.execute("""
     CREATE TABLE pp_package (
         id serial PRIMARY KEY, 
-        name text UNIQUE
-    );""")
-
-    cur.execute("""
+        name text UNIQUE NOT NULL
+    );
+    
     CREATE TABLE pp_package_instance (
         id serial PRIMARY KEY, 
-        package integer REFERENCES pp_package(id), 
-        version text, 
-        release text, 
-        arch text,
+        package integer NOT NULL REFERENCES pp_package(id), 
+        version text NOT NULL, 
+        release text NOT NULL, 
+        arch text NOT NULL,
         UNIQUE(package, version, release, arch)
-    );""")
-
-    cur.execute("""
+    );
+    
     CREATE TABLE pp_profile (
         id serial PRIMARY KEY,
-        hash text UNIQUE
-    );""")
-
-    cur.execute("""
+        hash text UNIQUE NOT NULL
+    );
+    
     CREATE TABLE pp_package_link (
         id serial PRIMARY KEY,
-        package_instance integer REFERENCES pp_package_instance(id),
-        profile integer REFERENCES pp_profile(id)
-    );""")
-
-    cur.execute("""
+        package_instance integer NOT NULL REFERENCES pp_package_instance(id),
+        profile integer NOT NULL REFERENCES pp_profile(id)
+    );
+    
     CREATE TABLE pp_host (
         id serial PRIMARY KEY,
-        name text UNIQUE,
-        profile integer REFERENCES pp_profile(id)
-    );""")
-
-    cur.execute("""
+        name text UNIQUE NOT NULL
+    );
+    
+    CREATE TABLE pp_profile_link (
+        id serial PRIMARY KEY,
+        host integer NOT NULL REFERENCES pp_host(id),
+        profile integer NOT NULL REFERENCES pp_profile(id),
+        date timestamp NOT NULL
+    );
+    
     CREATE TABLE pp_loading (
         id serial PRIMARY KEY,
-        name text,
-        version text, 
-        release text, 
-        arch text
-    );""")
-
-    cur.execute("UPDATE pp_version SET version = 1;")
+        name text NOT NULL,
+        version text NOT NULL, 
+        release text NOT NULL, 
+        arch text NOT NULL
+    );
+    
+    UPDATE pp_version SET version = 1;
+    """)
 
 
 def update_schema(cur):
