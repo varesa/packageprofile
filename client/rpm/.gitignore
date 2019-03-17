@@ -1,0 +1,3 @@
+noarch
+*.rpm
+.build-*.log
