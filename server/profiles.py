@@ -66,3 +66,9 @@ def create_profile(packages: dict):
 
         return existing[0] if existing else profile_id
 
+
+def set_host_profile(host, profile):
+    with get_cursor() as cur:
+        cur.execute(f"INSERT INTO pp_host (name, profile) "
+                    f"VALUES ('{host}', {profile}) "
+                    f"ON CONFLICT (name) DO UPDATE SET profile = EXCLUDED.profile;")

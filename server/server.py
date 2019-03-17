@@ -1,7 +1,7 @@
 from flask import Flask, request
 
 from database import init_db
-from profiles import create_profile
+from profiles import create_profile, set_host_profile
 
 app = Flask(__name__)
 
@@ -12,6 +12,7 @@ def publish():
     packages = request.json['packages']
 
     profile = create_profile(packages)
+    set_host_profile(hostname, profile)
 
     return "OK"
 
