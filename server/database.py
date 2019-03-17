@@ -21,7 +21,6 @@ class LoggingCursor(psycopg2.extensions.cursor):
         queries += 1
         logger.error(f"Queries executed: {queries}")
 
-
         try:
             psycopg2.extensions.cursor.execute(self, sql, args)
         except Exception as exc:
@@ -38,56 +37,6 @@ def init_db():
     database_schema.update_schema(cur)
     conn.commit()
     cur.close()
-
-
-def add_package_instance(package: dict) -> int:
-    """
-    Add a new package and a package instance to the database if they do not already exist,
-    returning the id of the instance
-    :param package: dict with the keys 'name', 'version', 'release' and 'arch'
-    :return: id of the pp_package_instance row
-    """
-    with get_cursor() as cur:
-
-        #
-        # Select an existing or create a new package
-        #
-        cur.execute(f"SELECT id FROM pp_package WHERE name = '{package['name']}';")
-        result = cur.fetchone()
-
-        if result:
-            package_id = result[0]
-        else:
-            cur.execute(f"""
-            INSERT INTO pp_package 
-                (name) VALUES ('{package['name']}')
-                RETURNING id;
-            """)
-            package_id = cur.fetchone()[0]
-
-        #
-        # Select an existing or create a new package instance
-        #
-        cur.execute(f"SELECT id FROM pp_package_instance"
-                    f" WHERE package = {package_id} "
-                    f"    AND version = '{package['version']}' "
-                    f"    AND release = '{package['release']}' "
-                    f"    AND arch = '{package['arch']}';")
-        result = cur.fetchone()
-        if result:
-            instance_id = result[0]
-        else:
-            cur.execute(f"""
-            INSERT INTO pp_package_instance 
-                (package, version, release, arch) 
-            VALUES 
-                ({package_id}, '{package['version']}', '{package['release']}', '{package['arch']}')
-            RETURNING id;
-            """)
-            instance_id = cur.fetchone()[0]
-
-        conn.commit()
-        return instance_id
 
 
 def get_package_instances(package=None):

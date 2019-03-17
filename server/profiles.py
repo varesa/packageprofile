@@ -25,7 +25,6 @@ def create_profile(packages: dict):
 
         cur.execute("""SELECT md5(string_agg(name || version || release || arch, ', ')) FROM pp_loading;""")
         hash = cur.fetchone()[0]
-        print(hash)
 
         cur.execute(f"""SELECT id FROM pp_profile WHERE hash = '{hash}';""")
         existing = cur.fetchone()[0]
