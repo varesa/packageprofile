@@ -1,28 +1,30 @@
+from flask import Flask, request
+
 from database import init_db, add_package_instance, get_package_instances
+from profiles import create_profile
+
+app = Flask(__name__)
+
+
+@app.route('/publish', methods=['POST'])
+def publish():
+    hostname = request.json['hostname']
+    packages = request.json['packages']
+
+
+    # 25k queries!
+    #instances = []
+    #for package in packages:
+    #    instances.append(add_package_instance(package))
+    #print(instances)
+    profile = create_profile(packages)
+
+    return "OK"
 
 
 def main():
     init_db()
-    add_package_instance({
-        "name": "testpkg",
-        "version": "1.0.0",
-        "release": "1.el0",
-        "arch": "noarch"
-    })
-    add_package_instance({
-        "name": "testpkg",
-        "version": "1.0.0",
-        "release": "2.el0",
-        "arch": "noarch"
-    })
-    add_package_instance({
-        "name": "other-pkg",
-        "version": "2.1.0",
-        "release": "1.el0",
-        "arch": "x86_64"
-    })
-    print(get_package_instances())
-
+    app.run()
 
 
 if __name__ == '__main__':

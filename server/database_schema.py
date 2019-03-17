@@ -27,7 +27,7 @@ def upgrade_version2(cur):
     cur.execute("""
     CREATE TABLE pp_profile (
         id serial PRIMARY KEY,
-        hash text
+        hash text UNIQUE
     );""")
 
     cur.execute("""
@@ -47,6 +47,28 @@ def upgrade_version2(cur):
     cur.execute("UPDATE pp_version SET version = 2;")
 
 
+def upgrade_version3(cur):
+    cur.execute("""
+    ALTER TABLE pp_package_instance
+    ADD CONSTRAINT uniq_inst UNIQUE(package, version, release, arch);
+    """)
+
+    cur.execute("UPDATE pp_version SET version = 3;")
+
+
+def upgrade_version4(cur):
+    cur.execute("""
+    CREATE TABLE pp_loading (
+        id serial PRIMARY KEY,
+        name text,
+        version text, 
+        release text, 
+        arch text
+    );""")
+
+    cur.execute("UPDATE pp_version SET version = 4;")
+
+
 def update_schema(cur):
     cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'pp_version')")
     tables_exist = cur.fetchone()[0]
@@ -64,3 +86,11 @@ def update_schema(cur):
     if version < 2:
         print("Upgrading to version 2")
         upgrade_version2(cur)
+
+    if version < 3:
+        print("Upgrading to version 3")
+        upgrade_version3(cur)
+
+    if version < 4:
+        print("Upgrading to version 4")
+        upgrade_version4(cur)
