@@ -2,8 +2,6 @@ import itertools
 from typing import Generator, Collection
 
 from database import conn, get_cursor
-from psycopg2.extensions import quote_ident as quote
-
 
 def chunks(i: Collection, n: int) -> Generator:
     """
@@ -34,15 +32,9 @@ def create_profile(packages: dict):
 
         for chunk in chunks(packages, 1000):
             values_q = ', '.join(f"(%s, %s, %s, %s)" for pkg in chunk)
-            values_v = [(pkg['name'], pkg['version'], pkg['release'], pkg['arch']) for pkg in chunk]
-            #for pkg in chunk:
-            #    values_v.append(pkg['name'])
-            #    values_v.append(pkg['version'])
-            #    values_v.append(pkg['release'])
-            #    values_v.append(pkg['arch'])
+            values_v = list(itertools.chain.from_iterable([(pkg['name'], pkg['version'], pkg['release'], pkg['arch']) for pkg in chunk]))
 
-            cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values_q};",
-                        list(itertools.chain.from_iterable(values_v)))
+            cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values_q};", values_v)
 
         cur.execute(f"""
         SELECT 

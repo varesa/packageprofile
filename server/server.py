@@ -33,14 +33,12 @@ def query():
 
     if 'packages' in request.args.keys():
         filter = request.args.get('packages')
-        print(filter)
         packages = get_packages(filter)
 
         if 'format' in request.args.keys() and request.args.get('format') == 'plain':
             return ''.join(f"{p[0]}: {p[1]}.{p[2]}-{p[3]}.{p[4]}\n" for p in packages)
         else:
             return "not implemented"
-
 
     return "?"
 
