@@ -1,3 +1,4 @@
+import itertools
 from typing import Generator, Collection
 
 from database import conn, get_cursor
@@ -32,10 +33,16 @@ def create_profile(packages: dict):
         """)
 
         for chunk in chunks(packages, 1000):
-            values = ', '.join(
-                f"('{quote(pkg['name'])}', '{quote(pkg['version'])}', '{quote(pkg['release'])}', '{quote(pkg['arch'])}')" for pkg in chunk
-            )
-            cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values};")
+            values_q = ', '.join(f"(%s, %s, %s, %s)" for pkg in chunk)
+            values_v = [(pkg['name'], pkg['version'], pkg['release'], pkg['arch']) for pkg in chunk]
+            #for pkg in chunk:
+            #    values_v.append(pkg['name'])
+            #    values_v.append(pkg['version'])
+            #    values_v.append(pkg['release'])
+            #    values_v.append(pkg['arch'])
+
+            cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values_q};",
+                        list(itertools.chain.from_iterable(values_v)))
 
         cur.execute(f"""
         SELECT 
@@ -95,14 +102,14 @@ def create_profile(packages: dict):
 
 def set_host_profile(host, new_profile):
     with get_cursor() as cur:
-        cur.execute(f"INSERT INTO pp_host (name) VALUES ('{quote(host)}') ON CONFLICT DO NOTHING;")
+        cur.execute(f"INSERT INTO pp_host (name) VALUES (%s) ON CONFLICT DO NOTHING;", (host,))
 
         cur.execute(f"""
         SELECT pp_profile_link.profile FROM pp_profile_link 
         JOIN pp_host ON pp_profile_link.host = pp_host.id 
-        WHERE pp_host.name = '{quote(host)}'
+        WHERE pp_host.name = %s
         ORDER BY pp_profile_link.id DESC LIMIT 1;
-        """)
+        """, (host,))
         result = cur.fetchone()
 
         if result:
@@ -112,9 +119,9 @@ def set_host_profile(host, new_profile):
 
         cur.execute(f"""
         INSERT INTO pp_profile_link (host, profile, date)
-        SELECT pp_host.id, {quote(new_profile)}, now() FROM pp_host
-        WHERE pp_host.name = '{quote(host)}';
-        """)
+        SELECT pp_host.id, %s, now() FROM pp_host
+        WHERE pp_host.name = %s;
+        """, (new_profile, host))
         conn.commit()
 
 
@@ -122,8 +129,8 @@ def get_host_profile(host):
     with get_cursor() as cur:
         cur.execute(f"""
         SELECT profile FROM pp_profile_link 
-        WHERE host = (SELECT id FROM pp_host WHERE name = '{quote(host)}') ORDER BY id DESC LIMIT 1;
-        """)
+        WHERE host = (SELECT id FROM pp_host WHERE name = %s) ORDER BY id DESC LIMIT 1;
+        """, (host,))
         return cur.fetchone()[0]
 
 
@@ -133,8 +140,8 @@ def get_profile_packages(profile):
         SELECT pp_package.name, pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch 
         FROM pp_package_link JOIN pp_package_instance ON pp_package_link.package_instance = pp_package_instance.id 
         JOIN pp_package ON pp_package_instance.package = pp_package.id 
-        WHERE profile = {quote(profile)};
-        """)
+        WHERE profile = %s;
+        """, (profile,))
         return cur.fetchall()
 
 
@@ -148,7 +155,7 @@ def get_packages(query):
         JOIN pp_package_link ON pp_package_link.package_instance = pp_package_instance.id 
         JOIN pp_profile_link ON pp_package_link.profile = pp_profile_link.profile 
         JOIN pp_host ON pp_host.id = pp_profile_link.host 
-        WHERE pp_package.name LIKE '{quote(query)}' AND 
+        WHERE pp_package.name LIKE %s AND 
               pp_profile_link.id IN (SELECT max(id) FROM pp_profile_link GROUP BY host);
-        """)
+        """, (query,))
         return cur.fetchall()
