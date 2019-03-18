@@ -108,3 +108,36 @@ def set_host_profile(host, new_profile):
         cur.execute(f"INSERT INTO pp_profile_link (host, profile, date) "
                     f"SELECT pp_host.id, {new_profile}, now() FROM pp_host WHERE pp_host.name = '{host}';")
         conn.commit()
+
+
+def get_host_profile(host):
+    with get_cursor() as cur:
+        cur.execute(f"SELECT profile FROM pp_profile_link WHERE host = (SELECT id FROM pp_host WHERE name = '{host}') ORDER BY id DESC LIMIT 1;")
+        return cur.fetchone()[0]
+
+
+def get_profile_packages(profile):
+    with get_cursor() as cur:
+        cur.execute(f"""
+        SELECT pp_package.name, pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch 
+        FROM pp_package_link JOIN pp_package_instance ON pp_package_link.package_instance = pp_package_instance.id 
+        JOIN pp_package ON pp_package_instance.package = pp_package.id 
+        WHERE profile = {profile};
+        """)
+        return cur.fetchall()
+
+
+def get_packages(query):
+    with get_cursor() as cur:
+        cur.execute(f"""
+        SELECT pp_host.name, pp_package.name, 
+               pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch
+        FROM pp_package 
+        JOIN pp_package_instance ON pp_package.id = pp_package_instance.package 
+        JOIN pp_package_link ON pp_package_link.package_instance = pp_package_instance.id 
+        JOIN pp_profile_link ON pp_package_link.profile = pp_profile_link.profile 
+        JOIN pp_host ON pp_host.id = pp_profile_link.host 
+        WHERE pp_package.name LIKE '{query}' AND 
+              pp_profile_link.id IN (SELECT max(id) FROM pp_profile_link GROUP BY host);
+        """)
+        return cur.fetchall()
