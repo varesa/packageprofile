@@ -37,28 +37,3 @@ def init_db():
     with get_cursor() as cur:
         database_schema.update_schema(cur)
         conn.commit()
-
-
-def get_package_instances(package=None):
-    with get_cursor() as cur:
-
-        filter = ""
-        if package:
-            filter = f" WHERE pp_package.name = '{package['name']}'"
-            for field in ('version', 'release', 'arch'):
-                if field in package.keys():
-                    filter += f" AND pp_package_instance.{field} = '{package[field]}'"
-
-        cur.execute(f"""
-        SELECT pp_package.id, pp_package_instance.id, 
-            pp_package.name, pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch 
-        FROM pp_package 
-        JOIN pp_package_instance ON pp_package.id=pp_package_instance.package
-        {filter};
-        """)
-
-        packages = [{"packge_id": r[0], "instance_id": r[1],
-                     "name": r[2], "version": r[3], "release": r[4], "arch": r[5]}
-                    for r in cur.fetchall()]
-
-        return packages
