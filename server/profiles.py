@@ -1,6 +1,7 @@
 from typing import Generator, Collection
 
 from database import conn, get_cursor
+from psycopg2.extensions import quote_ident as quote
 
 
 def chunks(i: Collection, n: int) -> Generator:
@@ -32,7 +33,7 @@ def create_profile(packages: dict):
 
         for chunk in chunks(packages, 1000):
             values = ', '.join(
-                f"('{pkg['name']}', '{pkg['version']}', '{pkg['release']}', '{pkg['arch']}')" for pkg in chunk
+                f"('{quote(pkg['name'])}', '{quote(pkg['version'])}', '{quote(pkg['release'])}', '{quote(pkg['arch'])}')" for pkg in chunk
             )
             cur.execute(f"INSERT INTO {table} (name, version, release, arch) VALUES {values};")
 
@@ -42,7 +43,8 @@ def create_profile(packages: dict):
                 name || '/' || version || '/' || release || '/' || arch, 
                 ', ' ORDER BY (name, version, release, arch)
             )) 
-        FROM {table};""")
+        FROM {table};
+        """)
         hash = cur.fetchone()[0]
 
         cur.execute(f"""SELECT id FROM pp_profile WHERE hash = '{hash}';""")
@@ -53,13 +55,15 @@ def create_profile(packages: dict):
             cur.execute(f"""
             INSERT INTO pp_package (name)
             SELECT DISTINCT name FROM {table}
-            ON CONFLICT DO NOTHING;""")
+            ON CONFLICT DO NOTHING;
+            """)
 
             cur.execute(f"""
             INSERT INTO pp_package_instance (package, version, release, arch)
             SELECT pp_package.id, version, release, arch FROM {table} 
                 JOIN pp_package ON pp_package.name = {table}.name
-            ON CONFLICT DO NOTHING;""")
+            ON CONFLICT DO NOTHING;
+            """)
 
             cur.execute(f"""
             INSERT INTO pp_profile (hash)
@@ -91,13 +95,14 @@ def create_profile(packages: dict):
 
 def set_host_profile(host, new_profile):
     with get_cursor() as cur:
-        cur.execute(f"INSERT INTO pp_host (name) VALUES ('{host}') ON CONFLICT DO NOTHING;")
+        cur.execute(f"INSERT INTO pp_host (name) VALUES ('{quote(host)}') ON CONFLICT DO NOTHING;")
 
         cur.execute(f"""
         SELECT pp_profile_link.profile FROM pp_profile_link 
         JOIN pp_host ON pp_profile_link.host = pp_host.id 
-        WHERE pp_host.name = '{host}'
-        ORDER BY pp_profile_link.id DESC LIMIT 1;""")
+        WHERE pp_host.name = '{quote(host)}'
+        ORDER BY pp_profile_link.id DESC LIMIT 1;
+        """)
         result = cur.fetchone()
 
         if result:
@@ -105,14 +110,20 @@ def set_host_profile(host, new_profile):
             if new_profile == old_profile:
                 return
 
-        cur.execute(f"INSERT INTO pp_profile_link (host, profile, date) "
-                    f"SELECT pp_host.id, {new_profile}, now() FROM pp_host WHERE pp_host.name = '{host}';")
+        cur.execute(f"""
+        INSERT INTO pp_profile_link (host, profile, date)
+        SELECT pp_host.id, {quote(new_profile)}, now() FROM pp_host
+        WHERE pp_host.name = '{quote(host)}';
+        """)
         conn.commit()
 
 
 def get_host_profile(host):
     with get_cursor() as cur:
-        cur.execute(f"SELECT profile FROM pp_profile_link WHERE host = (SELECT id FROM pp_host WHERE name = '{host}') ORDER BY id DESC LIMIT 1;")
+        cur.execute(f"""
+        SELECT profile FROM pp_profile_link 
+        WHERE host = (SELECT id FROM pp_host WHERE name = '{quote(host)}') ORDER BY id DESC LIMIT 1;
+        """)
         return cur.fetchone()[0]
 
 
@@ -122,7 +133,7 @@ def get_profile_packages(profile):
         SELECT pp_package.name, pp_package_instance.version, pp_package_instance.release, pp_package_instance.arch 
         FROM pp_package_link JOIN pp_package_instance ON pp_package_link.package_instance = pp_package_instance.id 
         JOIN pp_package ON pp_package_instance.package = pp_package.id 
-        WHERE profile = {profile};
+        WHERE profile = {quote(profile)};
         """)
         return cur.fetchall()
 
@@ -137,7 +148,7 @@ def get_packages(query):
         JOIN pp_package_link ON pp_package_link.package_instance = pp_package_instance.id 
         JOIN pp_profile_link ON pp_package_link.profile = pp_profile_link.profile 
         JOIN pp_host ON pp_host.id = pp_profile_link.host 
-        WHERE pp_package.name LIKE '{query}' AND 
+        WHERE pp_package.name LIKE '{quote(query)}' AND 
               pp_profile_link.id IN (SELECT max(id) FROM pp_profile_link GROUP BY host);
         """)
         return cur.fetchall()
